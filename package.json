@@ -1,0 +1,61 @@
+{
+  "name": "@uplinx/sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for the Uplinx LLM Marketplace API",
+  "author": "Uplinx",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uplinx22/Uplinx-Library.git"
+  },
+  "homepage": "https://github.com/uplinx22/Uplinx-Library#readme",
+  "bugs": {
+    "url": "https://github.com/uplinx22/Uplinx-Library/issues"
+  },
+  "keywords": [
+    "uplinx",
+    "llm",
+    "ai",
+    "sdk",
+    "api",
+    "openai",
+    "anthropic",
+    "gpt",
+    "claude",
+    "marketplace"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "rimraf": "^5.0.5",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
