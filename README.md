@@ -2,7 +2,7 @@
 
 Official TypeScript SDK for the **Uplinx LLM Marketplace API**.
 
-Access 50+ LLM models through a unified API. One integration, all models.
+Access 20+ LLM models through OpenRouter via a unified API. One integration, all models.
 
 ## Installation
 
@@ -20,28 +20,30 @@ yarn add @uplinx/sdk
 import { UplinxClient } from '@uplinx/sdk';
 
 const client = new UplinxClient({
-  baseUrl: 'https://api.uplinx.io',
-  apiKey: 'your-api-key',
+  apiKey: 'upx_your-api-key',
+  baseUrl: 'http://localhost:3001', // Optional, defaults to localhost
 });
 
 // List available engines
 const engines = await client.listEngines();
-console.log(engines);
+console.log(`${engines.length} engines available`);
 
-// Send a message
+// Send a message (auto-creates chat session)
 const response = await client.sendMessage({
-  engineId: 'gpt-4o',
+  engineId: engines[0].id,
   message: 'Explain quantum computing in simple terms',
 });
 
-console.log(response.assistantMessage.content);
+console.log(response.message);
+console.log(`Chat session: ${response.chatSessionId}`);
 ```
 
 ## Features
 
-- **Unified API** - Access OpenAI, Anthropic, Google, Meta, and more through one SDK
+- **Unified API** - Access OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek and more through OpenRouter
 - **Type-Safe** - Full TypeScript support with Zod runtime validation
-- **Streaming** - Real-time token streaming for chat responses
+- **Chat Sessions** - Persistent conversations with message history
+- **Engine Switching** - Switch models mid-conversation
 - **Usage Tracking** - Built-in cost and token usage tracking
 - **Error Handling** - Typed errors with detailed context
 
@@ -51,9 +53,9 @@ console.log(response.assistantMessage.content);
 
 ```typescript
 const client = new UplinxClient({
-  baseUrl: 'https://api.uplinx.io',  // Required: API base URL
-  apiKey: 'upx_...',                  // Optional: API key for authentication
-  timeout: 30000,                     // Optional: Request timeout in ms (default: 30000)
+  apiKey: 'upx_...',           // Required: API key for authentication
+  baseUrl: 'http://localhost:3001', // Optional: API base URL
+  timeout: 60000,               // Optional: Request timeout in ms (default: 60000)
 });
 ```
 
@@ -67,28 +69,39 @@ const engines = await client.listEngines();
 const gptEngines = await client.listEngines({ q: 'gpt' });
 
 // Filter by category
-const productivityEngines = await client.listEngines({ 
-  category: 'Productivity' 
+const codingEngines = await client.listEngines({ 
+  category: 'Coding' 
 });
 
-// Get specific engine
+// Sort by price
+const cheapestFirst = await client.listEngines({
+  sort: 'price-low'
+});
+
+// Get specific engine by slug
 const engine = await client.getEngine('gpt-4o');
+console.log(`${engine.name}: $${engine.priceInputPer1M} per 1M input tokens`);
 ```
 
 ### Chat Sessions
 
 ```typescript
-// Create a chat session
+// List all your chat sessions
+const chats = await client.listChats();
+console.log(`You have ${chats.length} conversations`);
+
+// Create a new chat session
 const chat = await client.createChat({
-  engineId: 'claude-3-opus',
+  engineId: 'claude-3-5-sonnet',
   title: 'Project Discussion',
 });
 
 // Get chat details
 const chatDetails = await client.getChat(chat.id);
 
-// Get messages
+// Get messages from a chat
 const messages = await client.getMessages(chat.id);
+messages.forEach(m => console.log(`${m.role}: ${m.content}`));
 ```
 
 ### Sending Messages
@@ -100,9 +113,24 @@ const response = await client.sendMessage({
   message: 'Hello, how can you help me today?',
 });
 
-console.log(response.assistantMessage.content);
-console.log(`Tokens: ${response.usage.inputTokens} in, ${response.usage.outputTokens} out`);
-console.log(`Cost: $${response.usage.costUsd.toFixed(4)}`);
+console.log(response.message);
+console.log(`Engine: ${response.engine.name}`);
+console.log(`Tokens: ${response.usage?.inputTokens} in, ${response.usage?.outputTokens} out`);
+console.log(`Cost: $${response.usage?.costUsd.toFixed(4)}`);
+
+// Switch engines mid-conversation
+const switchedResponse = await client.sendMessage({
+  chatSessionId: chat.id,
+  engineId: 'gpt-4o', // Use a different engine for this message
+  message: 'Now respond using GPT-4o',
+});
+
+// Create a new chat automatically
+const newChatResponse = await client.sendMessage({
+  engineId: 'deepseek-v3',
+  message: 'Start a new conversation',
+});
+console.log(`New chat created: ${newChatResponse.chatSessionId}`);
 ```
 
 ### Streaming Responses
@@ -157,11 +185,14 @@ try {
       case 'RATE_LIMITED':
         // Wait and retry
         break;
-      case 'INVALID_ENGINE':
-        // Use different engine
+      case 'NOT_FOUND':
+        // Resource doesn't exist
         break;
       case 'NETWORK_ERROR':
         // Check connection
+        break;
+      case 'TIMEOUT':
+        // Request took too long
         break;
     }
   }
@@ -179,6 +210,7 @@ import type {
   Message, 
   UsageRecord,
   UplinxClientConfig,
+  SendMessageResponse,
 } from '@uplinx/sdk';
 ```
 
@@ -191,23 +223,27 @@ import { EngineSchema, MessageSchema } from '@uplinx/sdk';
 const engine = EngineSchema.parse(unknownData);
 ```
 
+## Available Engines
+
+The SDK provides access to 20+ models including:
+
+| Engine | Provider | Category |
+|--------|----------|----------|
+| claude-3-5-sonnet | Anthropic | Reasoning |
+| claude-3-opus | Anthropic | Analysis |
+| gpt-4o | OpenAI | Multimodal |
+| gpt-4o-mini | OpenAI | Speed |
+| gemini-1-5-pro | Google | Multimodal |
+| llama-3-1-405b | Meta | Open Source |
+| deepseek-v3 | DeepSeek | Coding |
+| mistral-large | Mistral | Reasoning |
+| qwen-2-5-72b | Alibaba | Reasoning |
+
+See the full list with `client.listEngines()`.
+
 ## Browser Support
 
 The SDK works in both Node.js and browser environments. It uses the native `fetch` API.
-
-```html
-<script type="module">
-  import { UplinxClient } from 'https://unpkg.com/@uplinx/sdk';
-  
-  const client = new UplinxClient({
-    baseUrl: 'https://api.uplinx.io',
-  });
-</script>
-```
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
 
 ## License
 
