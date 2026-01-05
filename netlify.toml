@@ -1,0 +1,11 @@
+# Root-level Netlify config for monorepo
+# This tells Netlify to build from apps/web directory
+
+[build]
+  base = "apps/web"
+  command = "npm install && npm run build"
+  # Don't set publish - Next.js plugin handles this automatically
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
