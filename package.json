@@ -6,11 +6,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/uplinx22/Uplinx-Library.git"
+    "url": "https://github.com/uplinx22/Uplinx-SDK.git"
   },
-  "homepage": "https://github.com/uplinx22/Uplinx-Library#readme",
+  "homepage": "https://github.com/uplinx22/Uplinx-SDK#readme",
   "bugs": {
-    "url": "https://github.com/uplinx22/Uplinx-Library/issues"
+    "url": "https://github.com/uplinx22/Uplinx-SDK/issues"
   },
   "keywords": [
     "uplinx",
