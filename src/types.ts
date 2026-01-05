@@ -8,15 +8,15 @@ export const EngineSchema = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
-  provider: z.enum(['openai', 'anthropic', 'google', 'openrouter', 'xai', 'meta', 'mistral', 'deepseek', 'qwen']),
+  provider: z.string(),
   modelId: z.string(),
   description: z.string(),
   tags: z.array(z.string()),
   category: z.string(),
   contextWindow: z.number(),
-  latencyClass: z.enum(['fast', 'medium', 'slow']),
-  pricingInputPer1M: z.number(),
-  pricingOutputPer1M: z.number(),
+  latencyClass: z.string(),
+  priceInputPer1M: z.number(),
+  priceOutputPer1M: z.number(),
   isActive: z.boolean(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -31,11 +31,21 @@ export type Engine = z.infer<typeof EngineSchema>;
 export const MessageRoleSchema = z.enum(['user', 'assistant', 'system']);
 export type MessageRole = z.infer<typeof MessageRoleSchema>;
 
+export const EngineRefSchema = z.object({
+  id: z.string().optional(),
+  slug: z.string(),
+  name: z.string(),
+  provider: z.string().optional(),
+});
+
+export type EngineRef = z.infer<typeof EngineRefSchema>;
+
 export const MessageSchema = z.object({
   id: z.string(),
-  chatSessionId: z.string(),
+  chatSessionId: z.string().optional(),
   role: MessageRoleSchema,
   content: z.string(),
+  engine: EngineRefSchema.optional().nullable(),
   createdAt: z.string(),
 });
 
@@ -43,12 +53,14 @@ export type Message = z.infer<typeof MessageSchema>;
 
 export const ChatSessionSchema = z.object({
   id: z.string(),
-  userId: z.string(),
-  engineId: z.string(),
+  userId: z.string().optional(),
   title: z.string(),
+  defaultEngineId: z.string().optional().nullable(),
+  defaultEngine: EngineRefSchema.optional().nullable(),
+  messageCount: z.number().optional(),
   createdAt: z.string(),
-  updatedAt: z.string(),
-  engine: EngineSchema.optional(),
+  updatedAt: z.string().optional(),
+  lastMessageAt: z.string().optional().nullable(),
   messages: z.array(MessageSchema).optional(),
 });
 
@@ -61,7 +73,7 @@ export type ChatSession = z.infer<typeof ChatSessionSchema>;
 export const UsageRecordSchema = z.object({
   id: z.string(),
   userId: z.string(),
-  chatSessionId: z.string().optional(),
+  chatSessionId: z.string().optional().nullable(),
   engineId: z.string(),
   inputTokens: z.number(),
   outputTokens: z.number(),
@@ -110,13 +122,13 @@ export const PaginatedResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =
 export interface ListEnginesParams {
   q?: string;
   category?: string;
-  sort?: 'name' | 'price' | 'latency' | 'context';
+  sort?: string;
   page?: number;
   limit?: number;
 }
 
 export interface CreateChatParams {
-  engineId: string;
+  engineId?: string;
   title?: string;
 }
 
@@ -128,9 +140,14 @@ export interface SendMessageParams {
 }
 
 export interface SendMessageResponse {
-  message: Message;
-  assistantMessage: Message;
-  usage: {
+  chatSessionId: string;
+  engine: {
+    id: string;
+    slug: string;
+    name: string;
+  };
+  message: string;
+  usage?: {
     inputTokens: number;
     outputTokens: number;
     costUsd: number;
@@ -143,12 +160,28 @@ export interface GetUsageParams {
 }
 
 // ============================================================================
+// Chat List Response
+// ============================================================================
+
+export interface ListChatsResponse {
+  chats: ChatSession[];
+}
+
+export interface ListEnginesResponse {
+  engines: Engine[];
+}
+
+export interface GetMessagesResponse {
+  messages: Message[];
+}
+
+// ============================================================================
 // Client Configuration
 // ============================================================================
 
 export interface UplinxClientConfig {
-  baseUrl: string;
-  apiKey?: string;
+  baseUrl?: string;
+  apiKey: string;
   timeout?: number;
 }
 
@@ -157,4 +190,3 @@ export interface StreamCallbacks {
   onComplete?: (message: Message) => void;
   onError?: (error: Error) => void;
 }
-

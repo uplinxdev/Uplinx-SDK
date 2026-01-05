@@ -18,6 +18,8 @@ import {
 } from './types';
 import { z } from 'zod';
 
+const DEFAULT_BASE_URL = 'http://localhost:3001';
+
 /**
  * Uplinx API Client
  * 
@@ -28,8 +30,7 @@ import { z } from 'zod';
  * import { UplinxClient } from '@uplinx/sdk';
  * 
  * const client = new UplinxClient({
- *   baseUrl: 'https://api.uplinx.io',
- *   apiKey: 'your-api-key',
+ *   apiKey: 'upx_your-api-key',
  * });
  * 
  * // List available engines
@@ -45,13 +46,13 @@ import { z } from 'zod';
  */
 export class UplinxClient {
   private readonly baseUrl: string;
-  private readonly apiKey?: string;
+  private readonly apiKey: string;
   private readonly timeout: number;
 
   constructor(config: UplinxClientConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, '');
+    this.baseUrl = (config.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '');
     this.apiKey = config.apiKey;
-    this.timeout = config.timeout ?? 30000;
+    this.timeout = config.timeout ?? 60000;
   }
 
   /**
@@ -79,11 +80,8 @@ export class UplinxClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
     };
-
-    if (this.apiKey) {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
-    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -168,7 +166,7 @@ export class UplinxClient {
    * const gptEngines = await client.listEngines({ q: 'gpt' });
    * 
    * // Filter by category
-   * const productivityEngines = await client.listEngines({ category: 'Productivity' });
+   * const codingEngines = await client.listEngines({ category: 'Coding' });
    * ```
    */
   async listEngines(params: ListEnginesParams = {}): Promise<Engine[]> {
@@ -194,18 +192,33 @@ export class UplinxClient {
    * @example
    * ```typescript
    * const engine = await client.getEngine('gpt-4o');
-   * console.log(engine.name, engine.pricingInputPer1M);
+   * console.log(engine.name, engine.priceInputPer1M);
    * ```
    */
   async getEngine(slug: string): Promise<Engine> {
-    return this.request<Engine>('GET', `/engines/${slug}`, {
-      schema: EngineSchema,
-    });
+    const response = await this.request<{ engine: Engine }>('GET', `/engines/${slug}`);
+    return EngineSchema.parse(response.engine);
   }
 
   // ==========================================================================
   // Chat Methods
   // ==========================================================================
+
+  /**
+   * List all chat sessions
+   * 
+   * @returns Array of chat sessions
+   * 
+   * @example
+   * ```typescript
+   * const chats = await client.listChats();
+   * console.log(`You have ${chats.length} conversations`);
+   * ```
+   */
+  async listChats(): Promise<ChatSession[]> {
+    const response = await this.request<{ chats: ChatSession[] }>('GET', '/chats');
+    return z.array(ChatSessionSchema).parse(response.chats);
+  }
 
   /**
    * Create a new chat session
@@ -221,29 +234,28 @@ export class UplinxClient {
    * });
    * ```
    */
-  async createChat(params: CreateChatParams): Promise<ChatSession> {
-    return this.request<ChatSession>('POST', '/chats', {
+  async createChat(params: CreateChatParams = {}): Promise<ChatSession> {
+    const response = await this.request<{ chat: ChatSession }>('POST', '/chats', {
       body: params,
-      schema: ChatSessionSchema,
     });
+    return ChatSessionSchema.parse(response.chat);
   }
 
   /**
    * Get a chat session by ID
    * 
    * @param chatSessionId - The chat session ID
-   * @returns The chat session with messages
+   * @returns The chat session
    * 
    * @example
    * ```typescript
    * const chat = await client.getChat('chat_abc123');
-   * console.log(chat.messages);
+   * console.log(chat.title);
    * ```
    */
   async getChat(chatSessionId: string): Promise<ChatSession> {
-    return this.request<ChatSession>('GET', `/chats/${chatSessionId}`, {
-      schema: ChatSessionSchema,
-    });
+    const response = await this.request<{ chat: ChatSession }>('GET', `/chats/${chatSessionId}`);
+    return ChatSessionSchema.parse(response.chat);
   }
 
   /**
@@ -255,6 +267,7 @@ export class UplinxClient {
    * @example
    * ```typescript
    * const messages = await client.getMessages('chat_abc123');
+   * messages.forEach(m => console.log(`${m.role}: ${m.content}`));
    * ```
    */
   async getMessages(chatSessionId: string): Promise<Message[]> {
@@ -269,7 +282,7 @@ export class UplinxClient {
    * Send a message to a chat session
    * 
    * @param params - Message parameters
-   * @returns The user message, assistant response, and usage info
+   * @returns The assistant response and usage info
    * 
    * @example
    * ```typescript
@@ -278,12 +291,14 @@ export class UplinxClient {
    *   chatSessionId: 'chat_abc123',
    *   message: 'Explain quantum computing',
    * });
+   * console.log(response.message);
    * 
-   * // Create new chat and send
+   * // Create new chat and send (auto-creates session)
    * const response = await client.sendMessage({
    *   engineId: 'gpt-4o',
    *   message: 'Hello!',
    * });
+   * console.log('Chat ID:', response.chatSessionId);
    * ```
    */
   async sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
@@ -291,8 +306,7 @@ export class UplinxClient {
       body: {
         chatSessionId: params.chatSessionId,
         engineId: params.engineId,
-        messages: [{ role: 'user', content: params.message }],
-        stream: params.stream ?? false,
+        message: params.message,
       },
     });
   }
@@ -324,11 +338,8 @@ export class UplinxClient {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'text/event-stream',
+      'Authorization': `Bearer ${this.apiKey}`,
     };
-
-    if (this.apiKey) {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
-    }
 
     try {
       const response = await fetch(url.toString(), {
@@ -337,7 +348,7 @@ export class UplinxClient {
         body: JSON.stringify({
           chatSessionId: params.chatSessionId,
           engineId: params.engineId,
-          messages: [{ role: 'user', content: params.message }],
+          message: params.message,
           stream: true,
         }),
       });
@@ -432,4 +443,3 @@ export class UplinxClient {
     });
   }
 }
-
