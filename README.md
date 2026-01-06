@@ -1,4 +1,4 @@
-# @uplinx/sdk
+# @uplinx SDK
 
 Official TypeScript SDK for the **Uplinx LLM Marketplace API**.
 
